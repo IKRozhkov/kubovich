@@ -1,0 +1,34 @@
+- name: Prepare cluster nodes
+  hosts: all
+  remote_user: root
+  tasks:
+
+  - name: Initial setup
+    include: tasks/01.initial_setup.yml
+
+  - name: Install containerd
+    include: tasks/02.1.containerd.yml
+
+  - name: Download necessary binaries
+    include: tasks/03.binaries_download.yml
+
+- name: Initialize first controlplane node
+  hosts: controlplane[0]
+  remote_user: root
+  tasks:
+  - name: Initial setup
+    include: tasks/04.0.init_first_controlplane.yml
+
+  - name: Install CNI plugin
+    include: tasks/05.cni_plugin.yml
+
+- name: Prepare cluster nodes
+  hosts: all
+  remote_user: root
+  tasks:
+  - name: Initialize rest nodes
+    include: tasks/06.init_rest_nodes.yml
+
+  handlers:
+  - name: Add nodes to cluster
+    include: handlers/add_nodes.yml

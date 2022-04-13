@@ -1,0 +1,25 @@
+all:
+  children:
+    controlplane:
+      hosts:
+        master-1:
+          ip: 192.168.50.11
+          vip_interface: eth1
+        master-2:
+          ip: 192.168.50.12
+          vip_interface: eth1
+        master-3:
+          ip: 192.168.50.13
+          vip_interface: eth1
+      vars:
+        controlplane_ip: 192.168.50.100
+        pod_network_cidr: "10.244.0.0/16"
+        cni_plugin: "calico"
+    workers:
+      hosts:
+        node-1:
+          ip: 192.168.50.21
+        node-2:
+          ip: 192.168.50.22
+        # node-3:
+        #   ip: 192.168.50.23

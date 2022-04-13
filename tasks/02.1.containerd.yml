@@ -1,0 +1,74 @@
+---
+- name: Generate /etc/modules-load.d/containerd.conf for kernel modules persistence
+  ansible.builtin.template:
+    src: modules-load.d/containerd.conf.j2
+    dest: /etc/modules-load.d/containerd.conf
+
+- name: Load the overlay and br_netfilter module for current session
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Activate kernel parameters
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: '1'
+    state: present
+    reload: yes
+    sysctl_file: /etc/sysctl.d/99-kubernetes-cri.conf
+  loop:
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.bridge.bridge-nf-call-iptables
+    - net.ipv4.ip_forward
+
+- name: Local download containerd CRI with CNI 
+  include: tasks/download.yml
+  vars:
+    src: https://github.com/containerd/containerd/releases/download/v1.6.1/cri-containerd-1.6.1-linux-amd64.tar.gz
+    checksum: https://github.com/containerd/containerd/releases/download/v1.6.1/cri-containerd-1.6.1-linux-amd64.tar.gz.sha256sum
+    hash_type: sha256
+    dest: /tmp/cri-containerd-1.6.1-linux-amd64.tar.gz
+    mode: '0744'
+  run_once: true
+  delegate_to: localhost 
+
+- name: Unarchive containerd binaries
+  ansible.builtin.unarchive:
+    src: "{{ file_info.dest }}"
+    dest: /
+    extra_opts: --no-overwrite-dir
+    exclude: etc/cni/net.d/10-containerd-net.conflist
+
+- name: Local download CNI plugins
+  include: tasks/download.yml
+  vars:
+    src: https://github.com/containernetworking/plugins/releases/download/v1.1.1/cni-plugins-linux-amd64-v1.1.1.tgz
+    checksum: https://github.com/containernetworking/plugins/releases/download/v1.1.1/cni-plugins-linux-amd64-v1.1.1.tgz.sha256
+    hash_type: sha256
+    dest: /tmp/cni-plugins-linux-amd64-v1.1.1.tgz
+    mode: '0755'
+  run_once: true
+  delegate_to: localhost 
+
+- name: Create a directory /opt/cni/bin/ if it does not exist
+  ansible.builtin.file:
+    path: /opt/cni/bin/
+    state: directory
+    mode: '0775'
+
+- name: Unarchive CNI plugins binaries
+  ansible.builtin.unarchive:
+    src: "{{ file_info.dest }}"
+    dest: /opt/cni/bin
+    extra_opts:
+    - --no-overwrite-dir
+
+- name: Reload systemd manager configuration and start containerd service
+  ansible.builtin.systemd:
+    name: containerd
+    state: started
+    enabled: yes
+    daemon_reload: yes

@@ -1,0 +1,31 @@
+- name: Gather facts on listening ports
+  community.general.listen_ports_facts:
+
+- name: Checking necessary ports aren't already in use on controlplane nodes
+  set_fact:
+    used_controlplane_ports: "{{ ansible_facts.tcp_listen | selectattr('port', 'in', controlplane_ports) }}"
+  vars:
+    controlplane_ports: 
+      - 6443
+      - 2379
+      - 2380
+      - 10250
+      - 10259
+      - 10257
+  changed_when: "used_controlplane_ports | length == 0"
+  notify: 
+    - "join one more node"
+    - "join controlplane"
+  when: (inventory_hostname != groups['controlplane'][0]) and ('controlplane' in group_names)
+
+- name: Checking necessary ports aren't already in use on worker nodes
+  set_fact:
+    used_worker_ports: "{{ ansible_facts.tcp_listen | selectattr('port', 'in', worker_ports) }}"
+  vars:
+    worker_ports:
+      - 10250
+  changed_when: "used_worker_ports | length == 0"
+  notify: 
+    - "join one more node"
+    - "join worker"
+  when: "'workers' in group_names"

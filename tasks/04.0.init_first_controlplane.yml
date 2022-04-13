@@ -1,0 +1,54 @@
+- name: Gather facts on listening ports
+  community.general.listen_ports_facts:
+
+- name: Install kube-vip
+  include: tasks/kube-vip.yml
+
+- name: Checking necessary ports aren't already in use
+  set_fact:
+    used_controlplane_ports: "{{ ansible_facts.tcp_listen | selectattr('port', 'in', controlplane_ports) }}"
+  vars:
+    controlplane_ports: 
+      - 6443
+      - 2379
+      - 2380
+      - 10250
+      - 10259
+      - 10257
+
+- name: Generate /tmp/kubeadm-conf.yml config for kubeadm
+  ansible.builtin.template:
+    src: kubeadm-conf.yml.j2
+    dest: /tmp/kubeadm-conf.yml
+  when: used_controlplane_ports | length == 0
+
+- name: Init first control-plane node
+  ansible.builtin.shell: |
+    kubeadm init --config /tmp/kubeadm-conf.yml
+  when: used_controlplane_ports | length == 0
+
+    # kubeadm init \
+    # --apiserver-advertise-address {{ hostvars[inventory_hostname]['ip'] }} \
+    # --control-plane-endpoint "{{ controlplane_ip }}" \
+    # --pod-network-cidr "{{ pod_network_cidr }}"
+
+- name: Create a directory $HOME/.kube if it does not exist
+  ansible.builtin.file:
+    path: '{{ ansible_env.HOME }}/.kube'
+    state: directory
+    mode: '0755'
+
+- name: Copy kubeconfig file to $HOME/.kube
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: '{{ ansible_env.HOME }}/.kube/config'
+    owner: '{{ ansible_env.USER }}'
+    group: '{{ ansible_env.USER }}'
+    remote_src: yes
+    mode: '0600'
+
+- name: Store file into /tmp/fetched/host.example.com/tmp/somefile
+  ansible.builtin.fetch:
+    src: '{{ ansible_env.HOME }}/.kube/config'
+    dest: config
+    flat: yes

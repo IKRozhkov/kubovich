@@ -1,0 +1,59 @@
+- name: Get join command from the first controlplane node
+  ansible.builtin.shell: |
+    kubeadm token create --print-join-command
+  register: join_command
+  delegate_to: "{{ groups['controlplane'][0] }}"
+  run_once: true
+  listen: "join one more node"
+
+- name: Get certificate key from the first controlplane node
+  ansible.builtin.shell: |
+    kubeadm init phase upload-certs --upload-certs
+  register: certificate_key
+  delegate_to: "{{ groups['controlplane'][0] }}"
+  run_once: true
+  listen: "join one more node"
+
+- name: Join rest of controlplane nodes
+  ansible.builtin.shell: |
+    {{ join_command.stdout }} \
+    --control-plane \
+    --certificate-key {{ certificate_key.stdout_lines[2] }} \
+    --apiserver-advertise-address {{ hostvars[inventory_hostname]['ip'] }}
+  when: (inventory_hostname != groups['controlplane'][0]) and (used_controlplane_ports | length == 0)
+  listen: "join controlplane"
+  throttle: 1
+
+- name: Create a directory $HOME/.kube if it does not exist
+  ansible.builtin.file:
+    path: '{{ ansible_env.HOME }}/.kube'
+    state: directory
+    mode: '0755'
+  when: (inventory_hostname != groups['controlplane'][0]) and (used_controlplane_ports | length == 0)
+  listen: "join controlplane"
+
+- name: Copy kubeconfig file to $HOME/.kube
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: '{{ ansible_env.HOME }}/.kube/config'
+    owner: '{{ ansible_env.USER }}'
+    group: '{{ ansible_env.USER }}'
+    remote_src: yes
+    mode: '0600'
+  when: (inventory_hostname != groups['controlplane'][0]) and (used_controlplane_ports | length == 0)
+  listen: "join controlplane"
+
+- name: Generate kube-vip Pod manifest
+  ansible.builtin.template:
+    src: manifests/kube-vip.yaml.j2
+    dest: /etc/kubernetes/manifests/kube-vip.yaml
+  when: (inventory_hostname != groups['controlplane'][0]) and (used_controlplane_ports | length == 0)
+  listen: "join controlplane"
+
+- name: Join rest of worker nodes
+  ansible.builtin.shell: |
+    {{ join_command.stdout }} \
+    --certificate-key {{ certificate_key.stdout_lines[2] }} \
+    --apiserver-advertise-address {{ hostvars[inventory_hostname]['ip'] }}
+  when: (inventory_hostname != groups['controlplane'][0]) and (used_worker_ports | length == 0)
+  listen: "join worker"
