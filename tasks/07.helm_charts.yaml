@@ -1,0 +1,8 @@
+- name: Install metallb
+  include: tasks/helm_charts/metallb.yaml
+
+- name: Install traefik
+  include: tasks/helm_charts/traefik.yaml
+
+- name: Install kube-prometheus-stack
+  include: tasks/helm_charts/kube-prometheus-stack.yaml

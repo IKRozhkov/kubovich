@@ -1,0 +1,11 @@
+- name: Deploy Flannel CNI plugin
+  kubernetes.core.k8s:
+    state: present
+    template: manifests/kube-flannel.yaml.j2
+  when: cni_plugin == 'flannel'
+
+- name: Deploy Calico CNI plugin
+  kubernetes.core.k8s:
+    state: present
+    template: manifests/calico.yaml.j2
+  when: cni_plugin == 'calico'
