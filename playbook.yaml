@@ -2,33 +2,41 @@
   hosts: all
   remote_user: root
   tasks:
-
   - name: Initial setup
-    include: tasks/01.initial_setup.yml
+    include: tasks/01.initial_setup.yaml
 
   - name: Install containerd
-    include: tasks/02.1.containerd.yml
+    include: tasks/02.1.containerd.yaml
 
   - name: Download necessary binaries
-    include: tasks/03.binaries_download.yml
+    include: tasks/03.binaries_download.yaml
 
 - name: Initialize first controlplane node
   hosts: controlplane[0]
   remote_user: root
   tasks:
   - name: Initial setup
-    include: tasks/04.0.init_first_controlplane.yml
+    include: tasks/04.0.init_first_controlplane.yaml
 
   - name: Install CNI plugin
-    include: tasks/05.cni_plugin.yml
+    include: tasks/05.cni_plugin.yaml
 
 - name: Prepare cluster nodes
   hosts: all
   remote_user: root
   tasks:
   - name: Initialize rest nodes
-    include: tasks/06.init_rest_nodes.yml
+    include: tasks/06.init_rest_nodes.yaml
 
   handlers:
   - name: Add nodes to cluster
-    include: handlers/add_nodes.yml
+    include: handlers/add_nodes.yaml
+
+- name: Install HELM charts
+  hosts: controlplane
+  remote_user: root
+  tasks:
+  - name: Install helm charts
+    include: tasks/07.helm_charts.yaml
+  tags:
+  - helm
